@@ -97,9 +97,9 @@ class Comparator:
                     break
 
             if common:
-                self.commons.append(elementInSecond)
+                self.commons.append(elementInFirst)
             else:
-                self.different.append(elementInSecond)
+                self.different.append(elementInFirst)
 
 
 
