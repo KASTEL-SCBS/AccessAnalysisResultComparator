@@ -6,10 +6,7 @@ parser.add_argument('--pathFirst', type=str, required=True, help="Absolute path 
 parser.add_argument('--pathSecond', type=str, required=True, help="Absolute path to the second Access Analysis result file to compare against one")
 parser.add_argument('--outputDir', type=str, required=True, help="The absolute path to the output directory")
 parser.add_argument('--removeCodes', type=bool, default=True, help="Determines if the codes in haskalladio with _h are removed")
-
-testPath2 = "C:/Users/Freddy/git/Diss/PCM2Java4Joana/material/analysisresults/AccessAnalysis/queries-justify-backprojected.result.pretty"
-testPath1 = "C:/Users/Freddy/git/Diss/PCM2Java4Joana/material/analysisresults/AccessAnalysis/queries-justify-origin.result.pretty"
-testOutputPath = "C:/Users/Freddy/git/Diss/PCM2Java4Joana/material/analysisresults/AccessAnalysis"
+parser.add_argument('--handleUUIDs', type=bool, default=False, required=True, help="Provide if pseudo-ids or uuids are used in the results")
 
 
 class Comparator:
@@ -18,6 +15,7 @@ class Comparator:
     pathSecond: str
     outputPath: str
     removeHaskCodes: bool = True
+    handleUUIDs: bool = False
 
     contentFirst: str
     contentSecond: str
@@ -29,14 +27,16 @@ class Comparator:
     commons: List[str] = []
 
     adv = "adversary("
+    byteArrayName = "list("
     commonsFileName= "commonEntries.txt"
     differentFileNames= "differentEntries.txt"
 
-    def __init__(self, pathFirst:str, pathSecond:str, outputPath:str, removeCodes:bool):
+    def __init__(self, pathFirst:str, pathSecond:str, outputPath:str, removeCodes:bool, useUUIDs:bool):
         self.pathFirst = pathFirst
         self.pathSecond = pathSecond
         self.outputPath = outputPath
         self.removeHaskCodes = removeCodes
+        self.useUUIDs = useUUIDs
 
     def read(self, pathFirst, pathSecond):
 
@@ -63,7 +63,8 @@ class Comparator:
         parsingElement = False
 
         for line in allLines:
-            if line.startswith(self.adv):
+            #handling in uuid use heavily relies on pretty-print structure.
+            if line.startswith(self.adv) or (line.startswith('_') and self.handleUUIDs == True):
                 parsingElement = True
                 statement = ""
 
@@ -76,6 +77,8 @@ class Comparator:
 
         return splitResults
 
+
+
     def calculateElementRelations(self):
 
         self.read(self.pathFirst, self.pathSecond)
@@ -84,19 +87,88 @@ class Comparator:
 
     def calculateElementsRelations(self, first: List[str], second: List[str]):
 
-        common = False
 
-        for elementInSecond in second:
-            for elementInFirst in first:
-                if elementInFirst == elementInSecond:
-                    common = True
+        for elementInFirst in first:
+            common = False
+            for elementInSecond in second:
+                common = self.entriesAreEqual(elementInFirst, elementInSecond)
+
+                if common:
+                    break
 
             if common:
                 self.commons.append(elementInSecond)
             else:
                 self.different.append(elementInSecond)
 
-            common = False
+
+
+    def entriesAreEqual(self, firstEntry: str, secondEntry: str) -> bool:
+
+        #entries exactly equal
+        if firstEntry == secondEntry:
+            return True
+
+        firstEntryLines = firstEntry.splitlines()
+        secondEntryLines = secondEntry.splitlines()
+
+        cleanedFirstEntryLines = self.removeTreeElementsAndEmptyLines(firstEntryLines)
+        cleanedSecondEntryLines = self.removeTreeElementsAndEmptyLines(secondEntryLines)
+
+        #Length not equal, then the entries cannot be equal
+        if not (len(cleanedFirstEntryLines) == len(cleanedSecondEntryLines)):
+            return False
+
+        return self.checkLinePermutationEquality(cleanedFirstEntryLines, cleanedSecondEntryLines)
+
+
+
+
+    def checkLinePermutationEquality(self, firstLines: List[str], secondLines: List[str]) -> bool:
+
+        for firstLine in firstLines:
+            matches = False
+            secondLinesBuffer: List[str] = []
+            while secondLines:
+                secondLine = secondLines.pop()
+
+                if secondLine == firstLine:
+                    matches = True
+                    break
+
+                secondLinesBuffer.append(secondLine)
+
+            if not matches:
+                return False
+
+            for secondLineForBuffer in secondLines:
+                secondLinesBuffer.append(secondLineForBuffer)
+
+            secondLines = secondLinesBuffer
+
+        return True
+
+
+
+    def removeTreeElements(self, elementLine : str):
+
+        cleaned = elementLine.replace("`-", '')
+        cleaned = cleaned.replace("+-", '')
+        cleaned = cleaned.replace('|', '', 1)
+
+        return cleaned
+
+    def removeTreeElementsAndEmptyLines(self, lines: List[str]) -> List[str]:
+        cleaned: List[str] = []
+
+        for line in lines:
+            cleanedLine = self.removeTreeElements(line)
+            cleanedLine = cleanedLine.strip()
+
+            if not isBlank(cleanedLine):
+                cleaned.append(cleanedLine)
+
+        return cleaned
 
     def writeToFile(self):
         with open("{path}/{fileName}".format(path= self.outputPath, fileName=self.differentFileNames),'w') as diff:
@@ -127,8 +199,9 @@ if __name__ == '__main__':
     pathSecond = args.pathSecond
     pathOut = args.outputDir
     removeCodes = args.removeCodes
+    handleUUIDs = args.handleUUIDs
 
-    comp = Comparator(pathFirst, pathSecond, pathOut, removeCodes)
+    comp = Comparator(pathFirst, pathSecond, pathOut, removeCodes, handleUUIDs)
     comp.calculateElementRelations()
     comp.writeToFile()
     print("Done")
