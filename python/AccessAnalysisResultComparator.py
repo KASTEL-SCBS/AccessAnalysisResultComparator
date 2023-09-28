@@ -91,7 +91,6 @@ class Comparator:
 
     def calculateElementsRelations(self, first: List[str], second: List[str]):
 
-        common = False
 
         #TODO: Do consider line permutations
         for elementInSecond in second:
@@ -100,11 +99,78 @@ class Comparator:
                     common = True
 
             if common:
-                self.commons.append(elementInSecond)
+                self.commons.append(elementInFirst)
             else:
-                self.different.append(elementInSecond)
+                self.different.append(elementInFirst)
 
-            common = False
+
+
+    def entriesAreEqual(self, firstEntry: str, secondEntry: str) -> bool:
+
+        #entries exactly equal
+        if firstEntry == secondEntry:
+            return True
+
+        firstEntryLines = firstEntry.splitlines()
+        secondEntryLines = secondEntry.splitlines()
+
+        cleanedFirstEntryLines = self.removeTreeElementsAndEmptyLines(firstEntryLines)
+        cleanedSecondEntryLines = self.removeTreeElementsAndEmptyLines(secondEntryLines)
+
+        #Length not equal, then the entries cannot be equal
+        if not (len(cleanedFirstEntryLines) == len(cleanedSecondEntryLines)):
+            return False
+
+        return self.checkLinePermutationEquality(cleanedFirstEntryLines, cleanedSecondEntryLines)
+
+
+
+
+    def checkLinePermutationEquality(self, firstLines: List[str], secondLines: List[str]) -> bool:
+
+        for firstLine in firstLines:
+            matches = False
+            secondLinesBuffer: List[str] = []
+            while secondLines:
+                secondLine = secondLines.pop()
+
+                if secondLine == firstLine:
+                    matches = True
+                    break
+
+                secondLinesBuffer.append(secondLine)
+
+            if not matches:
+                return False
+
+            for secondLineForBuffer in secondLines:
+                secondLinesBuffer.append(secondLineForBuffer)
+
+            secondLines = secondLinesBuffer
+
+        return True
+
+
+
+    def removeTreeElements(self, elementLine : str):
+
+        cleaned = elementLine.replace("`-", '')
+        cleaned = cleaned.replace("+-", '')
+        cleaned = cleaned.replace('|', '', 1)
+
+        return cleaned
+
+    def removeTreeElementsAndEmptyLines(self, lines: List[str]) -> List[str]:
+        cleaned: List[str] = []
+
+        for line in lines:
+            cleanedLine = self.removeTreeElements(line)
+            cleanedLine = cleanedLine.strip()
+
+            if not isBlank(cleanedLine):
+                cleaned.append(cleanedLine)
+
+        return cleaned
 
     def removeTreeElements(self, elementLine : str):
         cleaned = elementLine
